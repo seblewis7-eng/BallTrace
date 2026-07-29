@@ -23,17 +23,17 @@
       <section class="stage-card" aria-label="Video tracing workspace">
         <div id="canvasWrap" class="canvas-wrap empty">
           <canvas id="displayCanvas" width="1280" height="720" aria-label="Video preview. Tap the golf ball before impact."></canvas>
-          <div id="emptyState" class="empty-state"><span class="ball-mark" aria-hidden="true"></span><strong>Select a short golf video</strong><span>The video stays on this device.</span></div>
+          <div id="emptyState" class="empty-state" aria-live="polite"><span class="ball-mark" aria-hidden="true"></span><strong>Select a short golf video</strong><span>The video stays on this device.</span></div>
           <button id="canvasPlayButton" class="canvas-play" type="button" aria-label="Play or pause preview" hidden>▶</button>
         </div>
-        <video id="sourceVideo" playsinline preload="metadata" hidden></video>
+        <video id="sourceVideo" class="source-video" playsinline webkit-playsinline muted preload="auto" aria-hidden="true"></video>
         <canvas id="analysisCanvas" width="1" height="1" hidden></canvas>
         <div class="timeline-row"><span id="currentTime">0:00.00</span><input id="scrubber" type="range" min="0" max="1" step="0.001" value="0" aria-label="Video timeline" disabled /><span id="duration">0:00.00</span></div>
         <div class="status-row"><span id="statusText">Choose a 3–15 second video to begin.</span><span id="confidenceText"></span></div>
         <progress id="trackProgress" value="0" max="1" hidden></progress>
       </section>
       <section class="controls-card">
-        <label class="primary-button file-button"><input id="fileInput" type="file" accept="video/*" /><span>Select video</span></label>
+        <label class="primary-button file-button"><input id="fileInput" type="file" accept="video/*" /><span id="fileButtonText">Select video</span></label>
         <button id="trackButton" class="primary-button" type="button" disabled>Track ball</button>
         <button id="resetButton" class="secondary-button" type="button" disabled>Reset point</button>
         <button id="exportButton" class="secondary-button" type="button" disabled>Export</button>
