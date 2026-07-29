@@ -1,11 +1,11 @@
 {
   "name": "balltrace",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "test:tracker": "node --test tests/tracker-core.test.mjs",
+    "test:tracker": "node --test tests/*.test.mjs",
     "typecheck": "node scripts/check.mjs --typecheck",
     "lint": "node scripts/check.mjs --lint",
     "build": "node scripts/build.mjs"
