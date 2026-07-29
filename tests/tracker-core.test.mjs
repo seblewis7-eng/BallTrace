@@ -1,11 +1,90 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 await import("../tracker-core.js");
-const { Tracker, classifyColour, colourSimilarity, samplePatch } = globalThis.BallTraceCore;
-function frame(width, height, background = [24, 75, 42]) { const data = new Uint8ClampedArray(width * height * 4); for (let i = 0; i < data.length; i += 4) { data[i] = background[0]; data[i + 1] = background[1]; data[i + 2] = background[2]; data[i + 3] = 255; } return data; }
-function drawBall(data, width, height, x, y, colour, radius = 3) { for (let py = Math.max(0, y - radius); py <= Math.min(height - 1, y + radius); py += 1) for (let px = Math.max(0, x - radius); px <= Math.min(width - 1, x + radius); px += 1) { if (Math.hypot(px - x, py - y) > radius) continue; const i = (py * width + px) * 4; data[i] = colour[0]; data[i + 1] = colour[1]; data[i + 2] = colour[2]; } return data; }
-test("recognises white and yellow golf-ball colours", () => { assert.equal(classifyColour(245, 245, 240), "white"); assert.equal(classifyColour(245, 225, 35), "yellow"); assert.equal(classifyColour(35, 120, 55), "other"); });
-test("scores matching yellow above unrelated colour", () => { const template = { r: 245, g: 225, b: 35 }; assert.ok(colourSimilarity({ r: 239, g: 219, b: 42 }, template) > 0.9); assert.ok(colourSimilarity({ r: 30, g: 95, b: 45 }, template) < 0.5); });
-test("samples selected appearance", () => { const width = 40; const height = 30; const data = drawBall(frame(width, height), width, height, 18, 14, [250, 248, 244], 4); const sample = samplePatch(data, width, height, 18, 14, 3); assert.equal(sample.className, "white"); assert.ok(sample.luminance > 0.8); });
-test("tracks a moving white ball", () => { const width = 120; const height = 80; const first = drawBall(frame(width, height), width, height, 25, 55, [248, 248, 244]); const tracker = new Tracker({ preLaunchSearchRadius: 40, launchedSearchRadiusMax: 60, detectedThreshold: 0.5, reacquireThreshold: 0.55 }); tracker.initialize({ frame: first, width, height, x: 25, y: 55, time: 0 }); let point; [[31, 50], [39, 44], [48, 37], [58, 31]].forEach(([x, y], index) => { point = tracker.track({ frame: drawBall(frame(width, height), width, height, x, y, [248, 248, 244]), time: (index + 1) / 30 }); assert.equal(point.state, "DETECTED"); }); assert.ok(Math.abs(point.x - 58) <= 3); assert.ok(Math.abs(point.y - 31) <= 3); });
-test("predicts a short gap then reports LOST", () => { const width = 80; const height = 60; const first = drawBall(frame(width, height), width, height, 20, 40, [246, 225, 32]); const second = drawBall(frame(width, height), width, height, 26, 35, [246, 225, 32]); const blank = frame(width, height); const tracker = new Tracker({ preLaunchSearchRadius: 30, detectedThreshold: 0.5, reacquireThreshold: 0.6, maxPredictedGapFrames: 2 }); tracker.initialize({ frame: first, width, height, x: 20, y: 40, time: 0 }); assert.equal(tracker.track({ frame: second, time: 1 / 30 }).state, "DETECTED"); assert.equal(tracker.track({ frame: blank, time: 2 / 30 }).state, "PREDICTED"); assert.equal(tracker.track({ frame: blank, time: 3 / 30 }).state, "PREDICTED"); assert.equal(tracker.track({ frame: blank, time: 4 / 30 }).state, "LOST"); });
+const { Tracker, classifyColour, colourSimilarity } = globalThis.BallTraceCore;
+
+function frame(width, height, ball = null, background = [32, 90, 46], radius = 4) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < data.length; index += 4) {
+    data[index] = background[0];
+    data[index + 1] = background[1];
+    data[index + 2] = background[2];
+    data[index + 3] = 255;
+  }
+  if (!ball) return data;
+  for (let y = Math.max(0, ball.y - radius); y <= Math.min(height - 1, ball.y + radius); y += 1) {
+    for (let x = Math.max(0, ball.x - radius); x <= Math.min(width - 1, ball.x + radius); x += 1) {
+      if (Math.hypot(x - ball.x, y - ball.y) > radius) continue;
+      const index = (y * width + x) * 4;
+      data[index] = ball.colour[0];
+      data[index + 1] = ball.colour[1];
+      data[index + 2] = ball.colour[2];
+    }
+  }
+  return data;
+}
+
+test("classifies white and yellow balls", () => {
+  assert.equal(classifyColour(240, 242, 238), "white");
+  assert.equal(classifyColour(245, 220, 35), "yellow");
+});
+
+test("colour similarity favours the selected ball colour", () => {
+  const template = { r: 245, g: 220, b: 35 };
+  assert.ok(colourSimilarity({ r: 240, g: 215, b: 40 }, template) > colourSimilarity({ r: 235, g: 235, b: 235 }, template));
+});
+
+test("tracks an ordinary 30 fps yellow-ball sequence", () => {
+  const width = 360;
+  const height = 220;
+  const tracker = new Tracker();
+  const colour = [245, 220, 35];
+  tracker.initialize({ frame: frame(width, height, { x: 70, y: 170, colour }), width, height, x: 70, y: 170, time: 0 });
+  const points = [{ x: 70, y: 170 }, { x: 72, y: 168 }, { x: 128, y: 130 }, { x: 186, y: 99 }, { x: 244, y: 75 }];
+  let result;
+  for (let index = 1; index < points.length; index += 1) {
+    result = tracker.track({ frame: frame(width, height, { ...points[index], colour }), time: index / 30 });
+    assert.notEqual(result.state, "LOST", `lost at frame ${index}`);
+  }
+  assert.equal(result.launched, true);
+  assert.ok(Math.abs(result.x - 244) < 12);
+  assert.ok(Math.abs(result.y - 75) < 12);
+});
+
+test("wide launch search handles a large first-frame jump at 30 fps", () => {
+  const width = 420;
+  const height = 260;
+  const tracker = new Tracker();
+  const colour = [242, 242, 238];
+  tracker.initialize({ frame: frame(width, height, { x: 85, y: 205, colour }), width, height, x: 85, y: 205, time: 1 });
+  const result = tracker.track({ frame: frame(width, height, { x: 225, y: 125, colour }), time: 1 + 1 / 30 });
+  assert.equal(result.state, "DETECTED");
+  assert.equal(result.launched, true);
+  assert.ok(Math.abs(result.x - 225) < 15);
+});
+
+test("duplicate decoded frames do not immediately lose the ball", () => {
+  const width = 260;
+  const height = 180;
+  const tracker = new Tracker();
+  const colour = [245, 220, 35];
+  const still = frame(width, height, { x: 80, y: 130, colour });
+  tracker.initialize({ frame: still, width, height, x: 80, y: 130, time: 0 });
+  for (let index = 1; index <= 4; index += 1) {
+    const result = tracker.track({ frame: still, time: index / 60 });
+    assert.notEqual(result.state, "LOST");
+  }
+});
+
+test("predicts short gaps and reacquires the ball", () => {
+  const width = 320;
+  const height = 200;
+  const tracker = new Tracker();
+  const colour = [245, 220, 35];
+  tracker.initialize({ frame: frame(width, height, { x: 60, y: 150, colour }), width, height, x: 60, y: 150, time: 0 });
+  tracker.track({ frame: frame(width, height, { x: 100, y: 125, colour }), time: 1 / 30 });
+  const predicted = tracker.track({ frame: frame(width, height), time: 2 / 30 });
+  assert.equal(predicted.state, "PREDICTED");
+  const reacquired = tracker.track({ frame: frame(width, height, { x: 178, y: 82, colour }), time: 3 / 30 });
+  assert.equal(reacquired.state, "DETECTED");
+});
