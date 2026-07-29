@@ -1,0 +1,20 @@
+{
+  "name": "BallTrace Golf Ball Tracker",
+  "short_name": "BallTrace",
+  "description": "Import a golf video, tap the ball once, and trace its detected flight locally on your iPhone.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050907",
+  "theme_color": "#07120d",
+  "categories": ["sports", "photo", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

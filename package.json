@@ -1,26 +1,16 @@
 {
   "name": "balltrace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test:tracker": "node scripts/tracker-smoke.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:tracker": "node --test tests/tracker-core.test.mjs",
+    "typecheck": "node scripts/check.mjs --typecheck",
+    "lint": "node scripts/check.mjs --lint",
+    "build": "node scripts/build.mjs"
   },
-  "dependencies": {
-    "next": "^16.0.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "^16.0.0",
-    "typescript": "^5.9.0"
+  "engines": {
+    "node": ">=22"
   }
 }
