@@ -46,7 +46,11 @@
       const maximum = Number.isFinite(video.duration)
         ? Math.max(0, video.duration - 0.001)
         : video.currentTime;
-      const target = Math.min(maximum, video.currentTime + 1 / 30);
+      const measuredDuration = Number.isFinite(video.__ballTraceFrameDuration)
+        ? video.__ballTraceFrameDuration
+        : 1 / 30;
+      const frameDuration = Math.max(1 / 240, Math.min(1 / 12, measuredDuration));
+      const target = Math.min(maximum, video.currentTime + frameDuration);
       if (target > video.currentTime + 0.0005) {
         const onSeeked = () => finish(performance.now(), {
           mediaTime: video.currentTime,
