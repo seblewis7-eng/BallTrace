@@ -31,9 +31,15 @@ test("upload waits for a decoded frame before enabling interaction", () => {
   assert.match(app, /ui\.emptyState\.hidden = true/);
 });
 
-test("service worker cache includes the range tracking safeguards", () => {
-  assert.match(serviceWorker, /balltrace-v7/);
+test("page includes an offscreen native-resolution crop canvas", () => {
+  assert.match(html, /id="sourceCropCanvas"/);
+  assert.match(app, /sourceCrop\.drawImage\(ui\.sourceVideo, originX, originY, width, height/);
+});
+
+test("service worker cache includes the adaptive tracking stack", () => {
+  assert.match(serviceWorker, /balltrace-v8/);
   assert.match(serviceWorker, /\/trajectory\.js/);
   assert.match(serviceWorker, /\/tracking-guard\.js/);
   assert.match(serviceWorker, /\/safari-frame-fallback\.js/);
+  assert.match(serviceWorker, /\/adaptive-source-tracker\.js/);
 });
