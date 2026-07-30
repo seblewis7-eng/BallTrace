@@ -43,7 +43,7 @@
       <section class="instruction-card">
         <h2>Three steps</h2>
         <ol><li><span>1</span> Scrub to immediately before impact.</li><li><span>2</span> Tap the white or yellow ball once.</li><li><span>3</span> Press <strong>Track ball</strong>.</li></ol>
-        <details><summary>How the tracer works</summary><p>BallTrace finds the launch at a lower resolution, then follows a small moving crop from the original video at source resolution. As the ball shrinks it changes from colour-and-shape tracking to multi-frame motion confirmation. Solid red is measured; dashed gold is estimated.</p></details>
+        <details><summary>How the tracer works</summary><p>BallTrace finds the launch, follows a moving crop from the original video, and reduces the expected ball size as it travels away. After visual contact is lost, a candidate must remain inside the flight corridor for three consecutive frames before it can return to solid red. Dashed gold is the estimated continuation.</p></details>
       </section>
       <p class="install-hint">On iPhone: open in Safari, tap Share, then Add to Home Screen.</p>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -53,6 +53,7 @@
     <script src="/tracking-guard.js"></script>
     <script src="/safari-frame-fallback.js"></script>
     <script src="/adaptive-source-tracker.js"></script>
+    <script src="/strict-reacquisition.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

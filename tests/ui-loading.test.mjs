@@ -36,10 +36,12 @@ test("page includes an offscreen native-resolution crop canvas", () => {
   assert.match(app, /sourceCrop\.drawImage\(ui\.sourceVideo, originX, originY, width, height/);
 });
 
-test("service worker cache includes the adaptive tracking stack", () => {
-  assert.match(serviceWorker, /balltrace-v8/);
+test("service worker cache includes the strict adaptive tracking stack", () => {
+  assert.match(serviceWorker, /balltrace-v9/);
   assert.match(serviceWorker, /\/trajectory\.js/);
   assert.match(serviceWorker, /\/tracking-guard\.js/);
   assert.match(serviceWorker, /\/safari-frame-fallback\.js/);
   assert.match(serviceWorker, /\/adaptive-source-tracker\.js/);
+  assert.match(serviceWorker, /\/strict-reacquisition\.js/);
+  assert.match(html, /\/strict-reacquisition\.js/);
 });
