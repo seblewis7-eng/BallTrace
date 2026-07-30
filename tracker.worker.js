@@ -1,6 +1,6 @@
 "use strict";
 
-importScripts("./tracker-core.js");
+importScripts("./tracker-core.js", "./tracking-guard.js");
 let tracker = null;
 self.addEventListener("message", (event) => {
   try {
