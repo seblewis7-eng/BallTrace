@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "balltrace-v4";
+const CACHE_NAME = "balltrace-v5";
 const APP_SHELL = [
   "/",
   "/index.html",
