@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "balltrace-v8";
+const CACHE_NAME = "balltrace-v9";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -11,6 +11,7 @@ const APP_SHELL = [
   "/tracking-guard.js",
   "/safari-frame-fallback.js",
   "/adaptive-source-tracker.js",
+  "/strict-reacquisition.js",
   "/tracker.worker.js",
   "/manifest.webmanifest",
   "/favicon.svg",
