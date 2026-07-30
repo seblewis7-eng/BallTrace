@@ -28,6 +28,7 @@
         </div>
         <video id="sourceVideo" class="source-video" playsinline webkit-playsinline muted preload="auto" aria-hidden="true"></video>
         <canvas id="analysisCanvas" width="1" height="1" hidden></canvas>
+        <canvas id="sourceCropCanvas" width="1" height="1" hidden></canvas>
         <div class="timeline-row"><span id="currentTime">0:00.00</span><input id="scrubber" type="range" min="0" max="1" step="0.001" value="0" aria-label="Video timeline" disabled /><span id="duration">0:00.00</span></div>
         <div class="status-row"><span id="statusText">Choose a 3–15 second video to begin.</span><span id="confidenceText"></span></div>
         <progress id="trackProgress" value="0" max="1" hidden></progress>
@@ -42,7 +43,7 @@
       <section class="instruction-card">
         <h2>Three steps</h2>
         <ol><li><span>1</span> Scrub to immediately before impact.</li><li><span>2</span> Tap the white or yellow ball once.</li><li><span>3</span> Press <strong>Track ball</strong>.</li></ol>
-        <details><summary>How the tracer works</summary><p>The solid red line is built only from accepted ball detections. BallTrace rejects sharp turns toward other range balls, searches ahead for reacquisition, then uses a dashed gold line for a rough continuation from the consistent early flight.</p></details>
+        <details><summary>How the tracer works</summary><p>BallTrace finds the launch at a lower resolution, then follows a small moving crop from the original video at source resolution. As the ball shrinks it changes from colour-and-shape tracking to multi-frame motion confirmation. Solid red is measured; dashed gold is estimated.</p></details>
       </section>
       <p class="install-hint">On iPhone: open in Safari, tap Share, then Add to Home Screen.</p>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -51,6 +52,7 @@
     <script src="/trajectory.js"></script>
     <script src="/tracking-guard.js"></script>
     <script src="/safari-frame-fallback.js"></script>
+    <script src="/adaptive-source-tracker.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
