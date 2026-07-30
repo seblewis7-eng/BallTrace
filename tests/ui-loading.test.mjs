@@ -26,11 +26,11 @@ test("the source video remains decodable while visually offscreen", () => {
 test("upload waits for a decoded frame before enabling interaction", () => {
   assert.match(app, /waitForMetadata/);
   assert.match(app, /waitForDecodedFrame/);
-  assert.match(app, /await seek\(0,true\)/);
+  assert.match(app, /await seek\(0, true\)/);
   assert.match(app, /await drawDecodedFrame\(\)/);
-  assert.match(app, /ui\.emptyState\.hidden=true/);
+  assert.match(app, /ui\.emptyState\.hidden = true/);
 });
 
-test("service worker cache was advanced for the tracking repair", () => {
-  assert.match(serviceWorker, /balltrace-v4/);
+test("service worker cache was advanced for the frame processing repair", () => {
+  assert.match(serviceWorker, /balltrace-v5/);
 });
