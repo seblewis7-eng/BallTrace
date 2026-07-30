@@ -1,12 +1,13 @@
 "use strict";
 
-const CACHE_NAME = "balltrace-v5";
+const CACHE_NAME = "balltrace-v6";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
   "/tracker-core.js",
+  "/trajectory.js",
   "/tracker.worker.js",
   "/manifest.webmanifest",
   "/favicon.svg",
