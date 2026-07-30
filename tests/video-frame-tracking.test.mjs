@@ -20,8 +20,10 @@ test("uses higher analysis resolution for 1080p clips", () => {
   assert.match(app, /900\s*\/\s*Math\.max/);
 });
 
-test("tracker includes a wide first-launch search", () => {
-  assert.match(core, /launchSearchRadius:\s*260/);
+test("tracker includes a sufficiently wide first-launch search", () => {
+  const radius = Number(core.match(/launchSearchRadius:\s*(\d+)/)?.[1]);
+  assert.ok(Number.isFinite(radius));
+  assert.ok(radius >= 260, `launch search radius ${radius} is too small for a 30 fps first-frame jump`);
   assert.match(core, /mode:\s*"launch"/);
   assert.match(core, /wideGridStep/);
 });
