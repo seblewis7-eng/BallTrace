@@ -31,7 +31,9 @@ test("upload waits for a decoded frame before enabling interaction", () => {
   assert.match(app, /ui\.emptyState\.hidden = true/);
 });
 
-test("service worker cache was advanced for the predicted flight build", () => {
-  assert.match(serviceWorker, /balltrace-v6/);
+test("service worker cache includes the range tracking safeguards", () => {
+  assert.match(serviceWorker, /balltrace-v7/);
   assert.match(serviceWorker, /\/trajectory\.js/);
+  assert.match(serviceWorker, /\/tracking-guard\.js/);
+  assert.match(serviceWorker, /\/safari-frame-fallback\.js/);
 });
