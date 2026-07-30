@@ -111,21 +111,45 @@ test("continuous plausible flight remains detected", () => {
   assert.equal(tracker.track(input(2 / 30)).state, "DETECTED");
 });
 
-test("reacquisition needs three consecutive plausible frames", () => {
+test("one uncertain frame does not trigger full reacquisition mode", () => {
   const tracker = new Tracker();
   initialize(tracker);
   tracker.queue.push(
     { state: "DETECTED", x: 493, y: 1473, score: 0.8 },
-    { state: "PREDICTED", x: 486, y: 1446, score: 0.2 },
-    { state: "DETECTED", x: 479, y: 1419, score: 0.62 },
-    { state: "DETECTED", x: 472, y: 1392, score: 0.63 },
-    { state: "DETECTED", x: 465, y: 1365, score: 0.64 },
+    { state: "DETECTED", x: 486, y: 1446, score: 0.8 },
+    { state: "PREDICTED", x: 479, y: 1419, score: 0.2 },
+    { state: "DETECTED", x: 472, y: 1392, score: 0.62 },
   );
-  assert.equal(tracker.track(input(1 / 30)).state, "DETECTED");
-  assert.equal(tracker.track(input(2 / 30)).state, "PREDICTED");
-  const first = tracker.track(input(3 / 30));
-  const second = tracker.track(input(4 / 30));
-  const third = tracker.track(input(5 / 30));
+  tracker.track(input(1 / 30));
+  tracker.track(input(2 / 30));
+  const miss = tracker.track(input(3 / 30));
+  const resumed = tracker.track(input(4 / 30));
+  assert.equal(miss.state, "PREDICTED");
+  assert.equal(miss.strictSearching, false);
+  assert.equal(resumed.state, "DETECTED");
+  assert.notEqual(resumed.provisionalReacquisition, true);
+});
+
+test("reacquisition needs three frames after a genuine two-frame loss", () => {
+  const tracker = new Tracker();
+  initialize(tracker);
+  tracker.queue.push(
+    { state: "DETECTED", x: 493, y: 1473, score: 0.8 },
+    { state: "DETECTED", x: 486, y: 1446, score: 0.8 },
+    { state: "PREDICTED", x: 479, y: 1419, score: 0.2 },
+    { state: "PREDICTED", x: 472, y: 1392, score: 0.2 },
+    { state: "DETECTED", x: 465, y: 1365, score: 0.62 },
+    { state: "DETECTED", x: 458, y: 1338, score: 0.63 },
+    { state: "DETECTED", x: 451, y: 1311, score: 0.64 },
+  );
+  tracker.track(input(1 / 30));
+  tracker.track(input(2 / 30));
+  tracker.track(input(3 / 30));
+  const secondMiss = tracker.track(input(4 / 30));
+  const first = tracker.track(input(5 / 30));
+  const second = tracker.track(input(6 / 30));
+  const third = tracker.track(input(7 / 30));
+  assert.equal(secondMiss.strictSearching, true);
   assert.equal(first.state, "PREDICTED");
   assert.equal(first.provisionalReacquisition, true);
   assert.equal(second.state, "PREDICTED");
@@ -140,14 +164,18 @@ test("flat sand candidates cannot become a real reacquisition", () => {
   initialize(tracker);
   tracker.queue.push(
     { state: "DETECTED", x: 493, y: 1473, score: 0.8 },
-    { state: "PREDICTED", x: 486, y: 1446, score: 0.2 },
+    { state: "DETECTED", x: 486, y: 1446, score: 0.8 },
+    { state: "PREDICTED", x: 479, y: 1419, score: 0.2 },
+    { state: "PREDICTED", x: 472, y: 1392, score: 0.2 },
     { state: "DETECTED", x: 430, y: 1470, score: 0.8 },
     { state: "DETECTED", x: 390, y: 1472, score: 0.8 },
     { state: "DETECTED", x: 350, y: 1474, score: 0.8 },
   );
   tracker.track(input(1 / 30));
   tracker.track(input(2 / 30));
-  for (const time of [3 / 30, 4 / 30, 5 / 30]) {
+  tracker.track(input(3 / 30));
+  tracker.track(input(4 / 30));
+  for (const time of [5 / 30, 6 / 30, 7 / 30]) {
     assert.notEqual(tracker.track(input(time)).state, "DETECTED");
   }
 });
