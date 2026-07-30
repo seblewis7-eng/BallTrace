@@ -96,9 +96,10 @@ test("filters dog-leg detections before prediction", () => {
   assert.ok(!filtered.some((point) => point.x === 390));
 });
 
-test("Safari fallback advances by one 30 fps frame before the app timeout", async () => {
+test("Safari fallback advances by the measured frame duration before the app timeout", async () => {
   const source = await readFile(new URL("../safari-frame-fallback.js", import.meta.url), "utf8");
-  assert.match(source, /currentTime \+ 1 \/ 30/);
+  assert.match(source, /__ballTraceFrameDuration/);
+  assert.match(source, /currentTime \+ frameDuration/);
   assert.match(source, /}, 1400\)/);
   assert.match(source, /seeked/);
 });
