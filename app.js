@@ -2,6 +2,7 @@
   "use strict";
 
   const $ = (selector) => document.querySelector(selector);
+  const REACQUIRE_WINDOW_FRAMES = 18;
   const ui = {
     fileInput: $("#fileInput"),
     fileButtonText: $("#fileButtonText"),
@@ -33,6 +34,7 @@
     selectionTime: 0,
     selectionTemplate: null,
     points: [],
+    predictedPoints: [],
     worker: null,
     busy: false,
     export: null,
@@ -50,9 +52,7 @@
   function toast(text) {
     ui.toast.textContent = text;
     ui.toast.hidden = false;
-    setTimeout(() => {
-      ui.toast.hidden = true;
-    }, 2800);
+    setTimeout(() => { ui.toast.hidden = true; }, 2800);
   }
 
   function updateButtons() {
@@ -60,8 +60,8 @@
     ui.scrubber.disabled = state.busy || !state.url;
     ui.trackButton.disabled = state.busy || !state.selection;
     ui.resetButton.disabled = state.busy || !state.selection;
-    ui.exportButton.disabled = state.busy || state.points.length < 2;
-    ui.shareButton.disabled = state.busy || state.points.length < 2;
+    ui.exportButton.disabled = state.busy || state.points.filter((point) => point.state === "DETECTED").length < 2;
+    ui.shareButton.disabled = ui.exportButton.disabled;
   }
 
   function waitForVideoEvent(eventNames, timeout = 10000) {
@@ -73,14 +73,8 @@
         for (const eventName of eventNames) ui.sourceVideo.removeEventListener(eventName, done);
         ui.sourceVideo.removeEventListener("error", fail);
       };
-      const done = () => {
-        cleanup();
-        resolve();
-      };
-      const fail = () => {
-        cleanup();
-        reject(new Error("Video could not be opened."));
-      };
+      const done = () => { cleanup(); resolve(); };
+      const fail = () => { cleanup(); reject(new Error("Video could not be opened.")); };
       for (const eventName of eventNames) ui.sourceVideo.addEventListener(eventName, done, { once: true });
       ui.sourceVideo.addEventListener("error", fail, { once: true });
       timer = setTimeout(() => {
@@ -126,6 +120,25 @@
     ui.canvasWrap.style.aspectRatio = `${width} / ${height}`;
   }
 
+  function strokeTrace(points, options) {
+    if (points.length < 2) return;
+    display.save();
+    display.strokeStyle = options.strokeStyle;
+    display.lineWidth = options.lineWidth;
+    display.lineCap = "round";
+    display.lineJoin = "round";
+    display.shadowColor = options.shadowColor;
+    display.shadowBlur = options.shadowBlur;
+    display.setLineDash(options.dash || []);
+    display.beginPath();
+    display.moveTo(points[0].smoothX, points[0].smoothY);
+    for (let index = 1; index < points.length; index += 1) {
+      display.lineTo(points[index].smoothX, points[index].smoothY);
+    }
+    display.stroke();
+    display.restore();
+  }
+
   function draw(time = ui.sourceVideo.currentTime, debug = true) {
     if (!state.url || ui.sourceVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
     try {
@@ -134,22 +147,24 @@
       return false;
     }
 
-    const visible = state.points.filter((point) => point.time <= time + 0.002 && point.state !== "LOST");
-    if (visible.length > 1) {
-      display.save();
-      display.strokeStyle = "#ff3b30";
-      display.lineWidth = Math.max(3, ui.displayCanvas.width / 220);
-      display.lineCap = "round";
-      display.lineJoin = "round";
-      display.shadowColor = "rgba(255,59,48,.7)";
-      display.shadowBlur = 8;
-      display.beginPath();
-      display.moveTo(visible[0].smoothX, visible[0].smoothY);
-      for (let index = 1; index < visible.length; index += 1) {
-        display.lineTo(visible[index].smoothX, visible[index].smoothY);
-      }
-      display.stroke();
-      display.restore();
+    const detected = state.points.filter((point) => point.time <= time + 0.002 && point.state === "DETECTED");
+    strokeTrace(detected, {
+      strokeStyle: "#ff3b30",
+      lineWidth: Math.max(3, ui.displayCanvas.width / 220),
+      shadowColor: "rgba(255,59,48,.7)",
+      shadowBlur: 8,
+    });
+
+    const estimated = state.predictedPoints.filter((point) => point.time <= time + 0.002);
+    if (estimated.length) {
+      const lastDetected = detected.at(-1) || state.points.filter((point) => point.state === "DETECTED").at(-1);
+      strokeTrace(lastDetected ? [lastDetected, ...estimated] : estimated, {
+        strokeStyle: "rgba(255,181,71,.9)",
+        lineWidth: Math.max(3, ui.displayCanvas.width / 235),
+        shadowColor: "rgba(255,181,71,.42)",
+        shadowBlur: 6,
+        dash: [11, 8],
+      });
     }
 
     if (debug && state.selection && Math.abs(time - state.selectionTime) < 0.05) {
@@ -186,15 +201,8 @@
         resolve();
         return;
       }
-
-      const done = () => {
-        cleanup();
-        resolve();
-      };
-      const fail = () => {
-        cleanup();
-        reject(new Error("Could not decode this frame."));
-      };
+      const done = () => { cleanup(); resolve(); };
+      const fail = () => { cleanup(); reject(new Error("Could not decode this frame.")); };
       const timer = setTimeout(fail, 6000);
       const cleanup = () => {
         clearTimeout(timer);
@@ -218,13 +226,13 @@
     state.selection = null;
     state.selectionTemplate = null;
     state.points = [];
+    state.predictedPoints = [];
     state.export = null;
     updateButtons();
     status("Loading video…");
     ui.emptyState.hidden = true;
     ui.canvasWrap.classList.remove("empty");
     ui.playButton.hidden = true;
-
     try {
       state.worker?.terminate();
       state.worker = null;
@@ -232,7 +240,6 @@
       ui.sourceVideo.removeAttribute("src");
       ui.sourceVideo.load();
       if (state.url) URL.revokeObjectURL(state.url);
-
       state.url = URL.createObjectURL(file);
       ui.sourceVideo.src = state.url;
       ui.sourceVideo.muted = true;
@@ -324,28 +331,37 @@
     throw new Error("Safari repeated the same decoded frame too many times.");
   }
 
-  function updateTrackingProgress(point, end, processedFrames) {
+  function updateTrackingProgress(point, end, processedFrames, searchFrames) {
     ui.progress.value = (point.time - state.selectionTime) / Math.max(0.01, end - state.selectionTime);
-    if (point.state === "LOST") {
-      status("Track lost. Preview uses the final reliable point.", point.confidence);
+    if (searchFrames > 0) {
+      status(`Ball hidden: searching the next ${REACQUIRE_WINDOW_FRAMES - searchFrames + 1}/${REACQUIRE_WINDOW_FRAMES} frames…`, point.confidence);
     } else {
       status(`Analysing frame ${processedFrames}: ${point.state.toLowerCase()}`, point.confidence);
     }
     draw(point.time);
   }
 
+  function updateSearchState(point, searchState) {
+    if (point.state === "DETECTED") {
+      if (searchState.searchFrames > 0) searchState.reacquisitions += 1;
+      searchState.searchFrames = 0;
+      return;
+    }
+    if (point.launched || searchState.searchFrames > 0) searchState.searchFrames += 1;
+  }
+
   async function trackPresentedFrames(end) {
     let lastMediaTime = state.selectionTime;
     let lastPresentedFrames = null;
-    let lost = false;
     let processedFrames = 0;
     let skippedFrames = 0;
+    const searchState = { searchFrames: 0, reacquisitions: 0 };
     const originalRate = ui.sourceVideo.playbackRate;
     ui.sourceVideo.playbackRate = 0.5;
     ui.sourceVideo.muted = true;
-
     try {
-      while (!lost && !ui.sourceVideo.ended && lastMediaTime < end - 0.001) {
+      while (!ui.sourceVideo.ended && lastMediaTime < end - 0.001
+        && searchState.searchFrames < REACQUIRE_WINDOW_FRAMES) {
         const metadata = await advanceToNextPresentedFrame(lastMediaTime, end);
         if (!metadata) break;
         const mediaTime = metadata.mediaTime;
@@ -358,43 +374,65 @@
         state.points.push(reply.point);
         lastMediaTime = mediaTime;
         processedFrames += 1;
-        lost = reply.point.state === "LOST";
-        updateTrackingProgress(reply.point, end, processedFrames);
+        updateSearchState(reply.point, searchState);
+        updateTrackingProgress(reply.point, end, processedFrames, searchState.searchFrames);
       }
     } finally {
       ui.sourceVideo.pause();
       ui.sourceVideo.playbackRate = originalRate;
     }
-    return { lost, processedFrames, skippedFrames };
+    return {
+      lost: searchState.searchFrames >= REACQUIRE_WINDOW_FRAMES,
+      processedFrames,
+      skippedFrames,
+      reacquisitions: searchState.reacquisitions,
+    };
   }
 
   async function trackThirtyFpsFallback(end) {
     let time = state.selectionTime;
-    let lost = false;
     let processedFrames = 0;
-    while (time < end && !lost) {
+    const searchState = { searchFrames: 0, reacquisitions: 0 };
+    while (time < end && searchState.searchFrames < REACQUIRE_WINDOW_FRAMES) {
       time = Math.min(end, time + 1 / 30);
       await seek(time);
       await waitForDecodedFrame();
       const frame = captureFrame();
       const reply = await workerMessage({ type: "frame", frame: frame.buffer, time }, [frame.buffer]);
       state.points.push(reply.point);
-      lost = reply.point.state === "LOST";
       processedFrames += 1;
-      updateTrackingProgress(reply.point, end, processedFrames);
+      updateSearchState(reply.point, searchState);
+      updateTrackingProgress(reply.point, end, processedFrames, searchState.searchFrames);
     }
-    return { lost, processedFrames, skippedFrames: 0 };
+    return {
+      lost: searchState.searchFrames >= REACQUIRE_WINDOW_FRAMES,
+      processedFrames,
+      skippedFrames: 0,
+      reacquisitions: searchState.reacquisitions,
+    };
+  }
+
+  function createPrediction() {
+    state.predictedPoints = globalThis.BallTraceTrajectory.buildPredictedTrajectory({
+      points: state.points,
+      width: ui.analysisCanvas.width,
+      height: ui.analysisCanvas.height,
+      videoEndTime: ui.sourceVideo.duration,
+      fps: 30,
+      maxSeconds: 5.5,
+    });
+    return state.predictedPoints;
   }
 
   async function trackBall() {
     if (!state.selection) return;
     state.busy = true;
     state.points = [];
+    state.predictedPoints = [];
     state.export = null;
     updateButtons();
     ui.progress.hidden = false;
     ui.progress.value = 0;
-
     try {
       ui.sourceVideo.pause();
       state.worker?.terminate();
@@ -418,14 +456,17 @@
       const result = typeof ui.sourceVideo.requestVideoFrameCallback === "function"
         ? await trackPresentedFrames(end)
         : await trackThirtyFpsFallback(end);
+      const prediction = createPrediction();
+      const detectedFrames = state.points.filter((point) => point.state === "DETECTED").length;
       await seek(state.selectionTime);
       await drawDecodedFrame();
-      if (result.skippedFrames > 0) {
-        status(`Tracking complete. Safari skipped ${result.skippedFrames} presented frame${result.skippedFrames === 1 ? "" : "s"}.`);
-      } else if (result.lost) {
-        status(`Tracking complete: followed ${result.processedFrames} decoded frames until the ball was no longer reliable.`);
+      if (prediction.length) {
+        const reacquired = result.reacquisitions ? `, reacquired ${result.reacquisitions} time${result.reacquisitions === 1 ? "" : "s"}` : "";
+        status(`Tracked ${detectedFrames} real frames${reacquired}. Solid red is tracked; dashed gold is the rough continuation.`);
+      } else if (result.skippedFrames > 0) {
+        status(`Tracked ${detectedFrames} real frames. Safari skipped ${result.skippedFrames} frame${result.skippedFrames === 1 ? "" : "s"}; no safe continuation was added.`);
       } else {
-        status(`Tracking complete: analysed ${result.processedFrames} decoded frames.`);
+        status(`Tracked ${detectedFrames} real frames. There was not enough reliable motion to predict the rest.`);
       }
     } catch (error) {
       status(error.message || "Tracking failed.");
@@ -441,14 +482,22 @@
     state.selection = null;
     state.selectionTemplate = null;
     state.points = [];
+    state.predictedPoints = [];
     state.export = null;
     draw();
     status("Tap the ball again on the current frame.");
     updateButtons();
   }
 
+  function traceEndTime() {
+    return Math.min(ui.sourceVideo.duration, Math.max(
+      state.points.filter((point) => point.state === "DETECTED").at(-1)?.time || state.selectionTime,
+      state.predictedPoints.at(-1)?.time || state.selectionTime,
+    ));
+  }
+
   async function createExport() {
-    if (state.points.length < 2) return null;
+    if (state.points.filter((point) => point.state === "DETECTED").length < 2) return null;
     state.busy = true;
     updateButtons();
     status("Rendering export in real time…");
@@ -458,20 +507,17 @@
         ? mimeCandidates.find((type) => MediaRecorder.isTypeSupported(type))
         : null;
       if (!mime || !ui.displayCanvas.captureStream) {
-        await seek(state.points.at(-1).time);
-        draw(state.points.at(-1).time, false);
+        await seek(traceEndTime());
+        draw(traceEndTime(), false);
         const blob = await new Promise((resolve) => ui.displayCanvas.toBlob(resolve, "image/png"));
         state.export = { blob, name: "balltrace.png" };
         return state.export;
       }
-
       await seek(state.selectionTime);
       const stream = ui.displayCanvas.captureStream(30);
       const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
       const chunks = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.push(event.data);
-      };
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
       const stopped = new Promise((resolve, reject) => {
         recorder.onstop = resolve;
         recorder.onerror = reject;
@@ -479,15 +525,14 @@
       recorder.start(250);
       ui.sourceVideo.muted = true;
       await ui.sourceVideo.play();
+      const end = traceEndTime();
       await new Promise((resolve) => {
         const tick = () => {
           draw(ui.sourceVideo.currentTime, false);
-          if (ui.sourceVideo.currentTime >= state.points.at(-1).time || ui.sourceVideo.ended) {
+          if (ui.sourceVideo.currentTime >= end || ui.sourceVideo.ended) {
             ui.sourceVideo.pause();
             resolve();
-          } else {
-            requestAnimationFrame(tick);
-          }
+          } else requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
       });
@@ -502,7 +547,7 @@
       await seek(state.selectionTime);
       await drawDecodedFrame();
       updateButtons();
-      status("Export ready.");
+      status("Export ready. Solid red is tracked; dashed gold is estimated.");
     }
   }
 
@@ -533,16 +578,13 @@
   }
 
   ui.fileInput.addEventListener("change", (event) => {
-    const file = event.target.files?.[0];
-    loadVideo(file).catch((error) => status(error.message));
+    loadVideo(event.target.files?.[0]).catch((error) => status(error.message));
   });
-
   ui.scrubber.addEventListener("input", async () => {
     ui.sourceVideo.pause();
     await seek(Number(ui.scrubber.value));
     await drawDecodedFrame();
   });
-
   ui.displayCanvas.addEventListener("pointerup", (event) => {
     if (!state.url || state.busy) return;
     event.preventDefault();
@@ -553,6 +595,7 @@
     };
     state.selectionTime = ui.sourceVideo.currentTime;
     state.points = [];
+    state.predictedPoints = [];
     state.export = null;
     const selectedFrame = captureFrame();
     state.selectionTemplate = globalThis.BallTraceCore.samplePatch(
@@ -567,7 +610,7 @@
     if (selectedClass === "yellow" || selectedClass === "white") {
       status(`${selectedClass[0].toUpperCase()}${selectedClass.slice(1)} ball selected. Press Track ball.`);
     } else {
-      status("Selection is not clearly white or yellow. Tap the centre of the ball again, or press Track ball to try.");
+      status("Selection is not clearly white or yellow. Tap the centre again, or press Track ball to try.");
     }
     updateButtons();
   });
@@ -576,7 +619,6 @@
   ui.resetButton.addEventListener("click", resetPoint);
   ui.exportButton.addEventListener("click", exportFile);
   ui.shareButton.addEventListener("click", shareFile);
-
   ui.playButton.addEventListener("click", async () => {
     if (ui.sourceVideo.paused) {
       await ui.sourceVideo.play();
@@ -598,17 +640,14 @@
     state.installPrompt = event;
     ui.installButton.hidden = false;
   });
-
   ui.installButton.addEventListener("click", async () => {
     if (!state.installPrompt) return;
     await state.installPrompt.prompt();
     state.installPrompt = null;
     ui.installButton.hidden = true;
   });
-
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
   }
-
   updateButtons();
 })();
