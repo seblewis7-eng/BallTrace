@@ -31,6 +31,7 @@ test("upload waits for a decoded frame before enabling interaction", () => {
   assert.match(app, /ui\.emptyState\.hidden = true/);
 });
 
-test("service worker cache was advanced for the frame processing repair", () => {
-  assert.match(serviceWorker, /balltrace-v5/);
+test("service worker cache was advanced for the predicted flight build", () => {
+  assert.match(serviceWorker, /balltrace-v6/);
+  assert.match(serviceWorker, /\/trajectory\.js/);
 });

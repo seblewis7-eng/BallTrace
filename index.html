@@ -42,12 +42,13 @@
       <section class="instruction-card">
         <h2>Three steps</h2>
         <ol><li><span>1</span> Scrub to immediately before impact.</li><li><span>2</span> Tap the white or yellow ball once.</li><li><span>3</span> Press <strong>Track ball</strong>.</li></ol>
-        <details><summary>Tracking tips</summary><p>Use a short daylight clip with the camera as still as possible. BallTrace stops after a short confidence loss rather than inventing a flight path.</p></details>
+        <details><summary>How the tracer works</summary><p>The solid red line is built from frames where BallTrace genuinely detects the ball. If the pixels disappear, it searches ahead for reacquisition, then uses a dashed gold line for a rough flight continuation based on the measured early path.</p></details>
       </section>
       <p class="install-hint">On iPhone: open in Safari, tap Share, then Add to Home Screen.</p>
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
     <script src="/tracker-core.js"></script>
+    <script src="/trajectory.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

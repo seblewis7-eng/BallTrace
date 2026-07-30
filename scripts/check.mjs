@@ -11,10 +11,13 @@ const scripts = files.filter((file) => /\.(?:js|mjs)$/.test(file));
 const errors = [];
 for (const file of scripts) { const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" }); if (result.status !== 0) errors.push(`${path.relative(root, file)} has invalid JavaScript: ${result.stderr.trim()}`); }
 if (mode === "--typecheck") {
-  const [html, app, worker, core] = await Promise.all([readFile(path.join(root, "index.html"), "utf8"), readFile(path.join(root, "app.js"), "utf8"), readFile(path.join(root, "tracker.worker.js"), "utf8"), readFile(path.join(root, "tracker-core.js"), "utf8")]);
+  const [html, app, worker, core, trajectory] = await Promise.all([readFile(path.join(root, "index.html"), "utf8"), readFile(path.join(root, "app.js"), "utf8"), readFile(path.join(root, "tracker.worker.js"), "utf8"), readFile(path.join(root, "tracker-core.js"), "utf8"), readFile(path.join(root, "trajectory.js"), "utf8")]);
   for (const id of ["fileInput", "sourceVideo", "displayCanvas", "analysisCanvas", "scrubber", "trackButton", "resetButton", "exportButton", "shareButton", "statusText"]) { if (!html.includes(`id=\"${id}\"`)) errors.push(`index.html is missing #${id}.`); if (!app.includes(`#${id}`)) errors.push(`app.js does not bind #${id}.`); }
   for (const type of ["init", "frame", "reset", "point", "error"]) if (!worker.includes(`\"${type}\"`)) errors.push(`tracker.worker.js is missing the ${type} protocol message.`);
   for (const api of ["Tracker", "samplePatch", "classifyColour", "colourSimilarity"]) if (!core.includes(api)) errors.push(`tracker-core.js is missing ${api}.`);
+  for (const api of ["buildPredictedTrajectory", "estimateMotion", "reliablePoints"]) if (!trajectory.includes(api)) errors.push(`trajectory.js is missing ${api}.`);
+  if (!html.includes("/trajectory.js")) errors.push("index.html does not load trajectory.js.");
+  if (!app.includes("BallTraceTrajectory.buildPredictedTrajectory")) errors.push("app.js does not create a predicted flight continuation.");
   if (!app.includes("new Worker(\"/tracker.worker.js\")")) errors.push("app.js does not create the tracker worker.");
   if (!app.includes("captureStream")) errors.push("app.js does not implement local canvas export.");
   if (!app.includes("navigator.share")) errors.push("app.js does not implement Web Share export.");
