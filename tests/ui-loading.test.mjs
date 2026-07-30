@@ -37,7 +37,7 @@ test("page includes an offscreen native-resolution crop canvas", () => {
 });
 
 test("service worker cache includes the strict adaptive tracking stack", () => {
-  assert.match(serviceWorker, /balltrace-v9/);
+  assert.match(serviceWorker, /balltrace-v10/);
   assert.match(serviceWorker, /\/trajectory\.js/);
   assert.match(serviceWorker, /\/tracking-guard\.js/);
   assert.match(serviceWorker, /\/safari-frame-fallback\.js/);
